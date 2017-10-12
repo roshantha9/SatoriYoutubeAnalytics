@@ -1,15 +1,19 @@
 import sys
 import time
-import pprint
+from pprint import pprint
 import logging
 import json
+import argparse
 from colorlog import ColoredFormatter
 
-from satori.rtm.client import make_client, SubscriptionMode
 
+# external frameworks APIs
+from satori.rtm.client import make_client, SubscriptionMode
 
 # local imports
 from SatoriSubscriptionHandler import SubscriptionObserver
+from elasticsearch import Elasticsearch
+from ESHandler import ESHandler
 
 
 # constants
@@ -18,9 +22,14 @@ DELAY = 1.0 # seconds
 TIMEOUT = 30 # seconds
 
 
-def setup_satori():
+#####################################################
+# initialisation functions
+#####################################################
+def setup_satori(cred_fname):
     """ Return a satori config (credentials and/or settings) """
-    with open('credentials.json') as json_data_file:
+    assert (cred_fname != None), "Error! Credentials File not provided"
+
+    with open(cred_fname) as json_data_file:
         data = json.load(json_data_file)
         creds = {
             'endpoint' : data['satori-credentials']['endpoint'],
@@ -48,27 +57,56 @@ def setup_logger():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(LOG_LEVEL)
-
     return logger
 
 
-def debug_satori_messages(subscription_observer):
+
+
+#####################################################
+# Debug functions
+#####################################################
+def debug_satori_messages(subscription_observer, field='title'):
+    if field == None:
+        for i, message in enumerate(subscription_observer.mailbox):
+            print "msg-"+ str(i) + ", " + str(message)
+    else:
+        for i, message in enumerate(subscription_observer.mailbox):
+            print "msg-"+ str(i) + ", " + message['snippet'][field].strip()
+            #print "msg-"+ str(i) + ", " + message['statistics']['view_count'].strip()
+    print "---"
+
+    #subscription_observer.clear_mailbox()
+
+
+#####################################################
+# Push messages to elastic
+#####################################################
+def store_satori_messages(subscription_observer, es):
     for i, message in enumerate(subscription_observer.mailbox):
-        print i, message['snippet']['title'].strip()
+        pushed_data = es.push_to_es(message)
+        print "-- [", i, "] --"
+        pprint(pushed_data)
 
-    subscription_observer.clear_mailbox()
 
 
 
-def main():
+
+
+
+#####################################################
+# M A I N
+#####################################################
+def main(cred_fname=None, es_mapping_fname=None):
     """ Main body - subscribes to a channel and receives messages """
 
     ## initialisation ##
     logger = setup_logger()
-    satori_credentials= setup_satori()
+    satori_credentials= setup_satori(cred_fname)
     endpoint = satori_credentials['endpoint']
     appkey = satori_credentials['appkey']
     channel = satori_credentials['channel'] # youtube-videos
+
+    es = ESHandler(logger, es_mapping_fname)
 
     # connect to satori data stream
     with make_client(endpoint=endpoint, appkey=appkey) as client:
@@ -79,8 +117,6 @@ def main():
         subscription_observer = SubscriptionObserver(logger)  # subscription service
         client.subscribe(channel, SubscriptionMode.SIMPLE, subscription_observer)
 
-
-
         try:
             while True:
                 if not subscription_observer.got_message_event.wait(TIMEOUT):
@@ -89,7 +125,14 @@ def main():
 
                 subscription_observer.got_message_event.clear() # clear mutex
 
-                debug_satori_messages(subscription_observer)
+                #debug_satori_messages(subscription_observer, field=None)
+
+                store_satori_messages(subscription_observer, es)
+
+                # clear all collected messages from satori
+                subscription_observer.clear_mailbox()
+
+                # wait before proceeding
                 time.sleep(DELAY)
 
         # cntrl-c to exit
@@ -101,7 +144,24 @@ def main():
 
 
 
+#####################################################
+# Parse arguments
+#####################################################
+def argument_handler():
+    # collect command line params
+    parser = argparse.ArgumentParser(__file__, description="Collect Satori OpenData")
+    parser.add_argument("--credentials", "-c", help="Credentials filename", default=None)
+    parser.add_argument("--es_mapping", "-m", help="ES Index Mapping filename", default=None)
+
+
+    args = parser.parse_args()
+
+    return args
+
 
 
 if __name__ == '__main__':
-    main()
+
+    args = argument_handler()
+
+    main(cred_fname=args.credentials, es_mapping_fname=args.es_mapping)

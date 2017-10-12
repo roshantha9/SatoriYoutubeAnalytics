@@ -20,7 +20,7 @@ class SubscriptionObserver(object):
 
 
     def on_subscription_data(self, data):
-        logger.debug("on_subscription_data:: Enter")
+        #logger.debug("on_subscription_data:: Enter")
         #self.mailbox = []
         for message in data['messages']:
             self.mailbox.append(message)
