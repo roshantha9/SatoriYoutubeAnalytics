@@ -1,12 +1,11 @@
 {
   "mappings": {
     "youtube-video":{
-      "_all" : { "enabled" : false},      
       "properties" : {
-        "ts" : { "type" : "date" },
+        "@timestamp" : { "type" : "date" , "format": "epoch_millis"},
         "title": { "type" : "text", "index": true, "index_options": "docs" },
         "desc" : { "type" : "text", "index": true, "index_options": "freqs" },
-        "ch_title" : { "type" : "text", "index": true, "index_options": "docs" },
+        "ch_title" : { "type" : "keyword", "index": true },
         "pub" : {"type" : "date" },
         "tags" : {"type" : "keyword" , "index": true},
         "cnt_dlikes" : {"type" : "long" , "index": true},

@@ -57,7 +57,8 @@ class ESHandler(object):
             sys.exit()
         else:
             formatted_data = {
-                'ts': datetime.now(),
+                #'ts': datetime.now(),
+                '@timestamp': self._unix_time_millis(),
                 'title': data['snippet']['title'].strip(),   # video title
                 #'desc' :  data['snippet']['description'].strip(),  # description
                 'desc' : "TBD",
@@ -101,3 +102,8 @@ class ESHandler(object):
         logger.error(msg)
         print exec_info
         sys.exit()
+
+    def _unix_time_millis(self):
+        dt = datetime.now()
+        epoch = datetime.utcfromtimestamp(0)
+        return int((dt - epoch).total_seconds() * 1000.0) - 28800000

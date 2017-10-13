@@ -17,8 +17,21 @@ case $doit in
   *) echo ">> Unknown option" ;;
 esac
 
+## start grafana service
+echo " "
+echo ">> Starting Grafana server"
+#sudo service grafana-server start
+sudo systemctl daemon-reload
+sudo systemctl start grafana-server
+#sudo systemctl status grafana-server
 
 ## start reading the messages from satori ##
 echo " "
 echo ">> Starting satori data collection"
-nohup python feedhandler/satori_youtube.py --credentials=feedhandler/credentials.json &
+nohup python feedhandler/satori_youtube.py --credentials=feedhandler/credentials.json --es_mapping=feedhandler/es-mapping.json &
+
+## launch elasticHQ
+firefox /home/rosh/Software/ElasticHQ/royrusso-elasticsearch-HQ-eb117d4/index.html
+
+## launch grafana
+firefox http://localhost:3000
